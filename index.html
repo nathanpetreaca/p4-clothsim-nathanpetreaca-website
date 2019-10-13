@@ -1,0 +1,350 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<style>
+  body {
+    padding: 100px;
+    width: 1000px;
+    margin: auto;
+    text-align: left;
+    font-weight: 300;
+    font-family: 'Open Sans', sans-serif;
+    color: #121212;
+  }
+  h1, h2, h3, h4 {
+    font-family: 'Source Sans Pro', sans-serif;
+  }
+</style>
+<title>CS 184 Cloth Simulation</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link href="https://fonts.googleapis.com/css?family=Open+Sans|Source+Sans+Pro" rel="stylesheet">
+</head>
+
+
+<body>
+
+<h1 align="middle">CS 184: Computer Graphics and Imaging, Spring 2017</h1>
+<h1 align="middle">Project 4: Cloth Simulator</h1>
+<h2 align="middle">Nathan Petreaca, CS184</h2>
+
+<br><br>
+
+<div>
+
+<h2 align="middle">Overview</h2>
+<p>Here we explore the ideas of physical simulation, a major part of graphics. Rather than trying to manually animate the behavior of physical systems observed in the world, we can simply model them and then simulate them. A very relevant example of this is the simulation of cloth. Here, we explore the process of creating this simulation almost in its entirety. We create a real-time simulation of cloth. First, we examine the data structures used to define the cloth and represent it as a model and in software. We then go on to understanding how we can get this cloth that we have created in the 3D space to move and, in that case, we use numerical integration. Once we know how this cloth moves, we need to understand how it interacts with the environment, objects around it and even itself. Here we implement collisions with objects and self-collisions to prevent the cloth from clipping with itself. </p>
+
+<p> At the end we also want to understand how we can light the cloth in real time. A path-tracing method, or other physically based lighting method is simply too slow. To solve this, we explore shader programs and how they can be used to quickly and effectively light a scene and also define material properties on textures. </p>
+
+<h2 align="middle">Part I: Masses and springs</h2>
+
+<p> Our first step is to model the cloth. Here we represent our cloth as a wireframe of masses connected by springs in different configurations. Here we can think of the springs as representative of the fibers in a cloth. We model 3 types of springs: Structural, Shearing, and Bending springs. Each of these sets of springs garner particular aspects of the cloth. For example, the Bending springs are added to prevent the cloth from effortlessly folding onto itself without restraint, the Shearing springs are to prevent the cloth from have no resistance in the diagonal directions, and the structural springs are to add support in the cardinal directions. </p>
+
+<p> Below we see how this is related to how we place the springs. Bending springs are connected to further neighbors two away, structural are connected to nearest neighbors, and shearing are for diagonal neighbors.
+
+        <div align="left">
+            <table style="width=100%">
+                <tr>
+                    <td align="middle">
+                    <img src="images/a (40).jpg" width="480px" />
+                    <figcaption align="middle">Cloth wireframe</figcaption>
+                    <td align="middle">
+                    <img src="images/a (1).jpg" width="480px" />
+                    <figcaption align="middle">with all constraints</figcaption>
+                </tr>
+                <tr>
+                    <td align="middle">
+                    <img src="images/a (2).jpg" width="480px" />
+                    <figcaption align="middle">with only shearing constraints</figcaption>
+                    <td align="middle">
+                    <img src="images/a (3).jpg" width="480px" />
+                    <figcaption align="middle">without any shearing constraints</figcaption>
+                </tr>
+    
+            </table>
+        </div>
+
+<br>
+<h2 align="middle">Part 2: Simulation via numerical integration</h2>
+<p>
+To simulate where the clothes point masses will be in the next time step. We model all the forces acting on each mass through basic physics equations. These consist of external forces F=ma, and structural constraints (Hooke's law in this case) Fs=Ks*(||Pa-Pb||-l) where Pa and Pb are the positions of the masses and l is the rest length of the spring. Ks here is the spring constant and describes how stiff the springs are.
+</p>
+<p>
+Now that we have the force acting on the masses for the current time step, we need to perform numerical integration to compute the change in position. There are many ways to do this, but here we use Verlet Integration. Something important to maintain is that here we add a damping term to simulate loss of energy in the cloth. </p>
+<p> We also implement another constraint to keep the cloth from deforming too much. For each spring, we correct the two point masses' positions such that the spring's length is at most 10% greater than its rest length.
+</p>
+<p>
+Below we describe the effects of changing some of the parameters mentioned.
+<p>
+<b>Effect of changing Ks:</b>
+</p>
+
+ <p>
+  High Ks:
+</p>
+
+<br>
+ <img src="images/a (5).jpg" width="480px" />
+ <br>
+
+ <p>
+  Low Ks:
+  </p>
+
+<br>
+ <img src="images/a (4).jpg" width="480px" />
+ <br>
+<p> Here we see how Ks represents stiffness, as it increases, the less the material wants to bend. </p>
+<br>
+  <p>
+  <b>Effect of density:</b>
+  </p>
+ <p>
+    High:
+    </p>
+<br>
+ <img src="images/a (7).jpg" width="480px" />
+ <br>
+    <p>
+    Low:
+  </p>
+     <img src="images/a (6).jpg" width="480px" />
+
+     <p> We can see that as density increase the material is less apt to fold. Imagine a heavy wool sweater, versus a light silk shirt. </p>
+  <br>
+  <p>
+  <b>Effect of damping:</b>
+</p>
+
+ <p>
+    High: Slowly fell | Rigid
+    </p>
+        <div align="left">
+            <table style="width=100%">
+                <tr>
+                    <td align="middle">
+                    <img src="images/a (8).jpg" width="480px" />
+                    </td>
+                    <td align="middle">
+                    <img src="images/a (9).jpg" width="480px" />
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+ <p>
+    Low: Quckly Fell | Shimmers
+    </p>
+
+        <div align="left">
+            <table style="width=100%">
+                <tr>
+                    <td align="middle">
+                    <img src="images/a (10).jpg" width="480px" />
+                    </td>
+                    <td align="middle">
+                    <img src="images/a (11).jpg" width="480px" />
+                    </td>
+                </tr>
+            </table>
+        </div>
+<P> Here we observe that damping does indeed work as a resistance to keeping energy. The material with more damping has less energy and thus moves slower and stays together while the material with more damping kept most of its energy and thus moved very quickly and sporadically.
+
+  <h2 align="middle">Part 3: Handling collisions with other objects</h2>
+<p> Here we make it so that our cloth does not clip through objects. </p> The procedure is fairly straightforward; we determine whether or not a given point mass is inside the primitive. If it is, we adjust the point mass's position so that it stays just outside the primitive's surface, accounting for friction as we do so. </p>
+<p> Below we see the results. </p>
+        <div align="left">
+            <table style="width=100%">
+                <tr>
+                    <td align="middle">
+                    <img src="images/a (12).jpg" width="480px" />
+                    <figcaption align="middle">Ks= 5000</figcaption>
+                    <td align="middle">
+                    <img src="images/a (13).jpg" width="480px" />
+                    <figcaption align="middle">Ks = 500</figcaption>
+                </tr>
+                <tr>
+                    <td align="middle">
+                    <img src="images/a (14).jpg" width="480px" />
+                    <figcaption align="middle">Ks =5000</figcaption>
+                </tr>
+    
+            </table>
+        </div>
+<p> As shown with the sphere collision examples above, as Ks increases, the stiffer the material gets. </p>
+
+
+<br>
+ <img src="images/a (15).jpg" width="480px" />
+ <br>
+
+  <h2 align="middle">Part 4: Handling self-collisions</h2>
+<p> Now this is a little bit more complex. Here we cannot naively check all pairs of point masses and push them away from each other once they are too close. This would be O(n^2) in complexity and too inefficient for real-time simulations, so we instead implement spatial hashing. At each time step, we build a hash table that maps a float to a vector of point masses, where each float value uniquely represents a 3D box volume in the scene. Once we build this table then, we look up point masses that share the same 3D volume and apply a repulsive force to them if they are too close. In essence, we then only check pairs of point masses that are already relatively close together. </p>
+
+<p> Below we see the results, the cloth repulses away from itself, thus it does not clip through itself. </p>
+        <div align="left">
+            <table style="width=100%">
+                <tr>
+                    <td align="middle">
+                    <img src="images/a (16).jpg" width="480px" />
+
+                    <td align="middle">
+                    <img src="images/a (18).jpg" width="480px" />
+              
+                </tr>
+                <tr>
+                    <td align="middle">
+                    <img src="images/a (17).jpg" width="480px" />
+
+                </tr>
+    
+            </table>
+        </div>
+
+<p> Below we observe how the density of the material and the spring constant Ks effect how the material interacts with itself.
+<p>
+<b>Effect of density:</b>
+</p>
+ <p>
+  High Density:
+</p>
+<br>
+ <img src="images/a (19).jpg" width="480px" />
+ <br>
+
+ <p>
+  Low Density:
+  </p>
+
+<br>
+ <img src="images/a (20).jpg" width="480px" />
+ <br>
+<p> Here we see an interesting effect, as density increases, the material wants to fold in on itself more. This is due to the fact that the added density leads to an increased inertia when falling down that pulls the cloth collectively down onto itself. </p>
+<br>
+  <p>
+  <b>Effect of changing Ks:</b>
+  </p>
+ <p>
+    High Ks:
+    </p>
+
+ <img src="images/a (21).jpg" width="480px" />
+
+    <p>
+    Low Ks:
+  </p>
+     <img src="images/a (22).jpg" width="480px" />
+
+
+<p> Here we see the expected result, when Ks is higher the material is stiffer and less likely to fold in on itself.</p>
+     <br>
+    <h2 align="middle">Part 5: Shaders</h2>
+<p> Now that we have a real-time simulation of this cloth material, we want to be able to light it in real-time. Path-tracing and other physically based methods would be too costly to be able to run in real time, thus we use some GLSL shader programs to achieve our goal. </p>
+
+<p> Shaders are basically isolated programs that run in parallel on the GPU. Their job is to execute a portion of the graphics pipeline. The two examples of shader programs that we use here are Vertex and Fragment shaders. Vertex shaders are responsible for the Vertex Processing stage in the rasterization pipeline. Its responsibilities would include modeling, viewing, and transforming points in the 3D space scene; thus, it modifies the scenes geometric properties. Fragment shaders are responsible for processing the fragments left over after rasterization. This shader usually takes in geometric data from the Vertex shader to compute the color of each fragment. So, the system that we have is this: we have one program configuring the geometric data (the Vertex shader) and a separate program determining the color of each fragment using that geometric data. By using some simple perception-based models, and by knowing the vectors of fragments, the positions of light sources, and other geometric data given to it by the Vertex shader, the fragment shader can effectively and very quickly light up the scene. </p> 
+
+<p> An effective example of a shading model used by the Fragment shader is the Blinn-Phong shading model. What it does is separately calculate each part of how an object is illuminated based on how certain parts of the object should look. The object's illumination is broken down separately into the combination of Ambient, Diffuse, and Specular light. The Specular light is the shiny part of the object where light simply reflects off, the diffuse part is the amount of light bouncing off in all directions, and the ambient light is simply a constant light added to fill in the object</p>
+<p> Below we show this whole process. </p>
+        <div align="left">
+            <table style="width=100%">
+                <tr>
+                    <td align="middle">
+                    <img src="images/a (23).jpg" width="480px" />
+                    <figcaption align="middle">Only Ambient</figcaption>
+                    <td align="middle">
+                    <img src="images/a (24).jpg" width="480px" />
+                    <figcaption align="middle">Only Specular</figcaption>
+                </tr>
+                <tr>
+                    <td align="middle">
+                    <img src="images/a (25).jpg" width="480px" />
+                    <figcaption align="middle">Only Diffuse</figcaption>
+                    <td align="middle">
+                    <img src="images/a (26).jpg" width="480px" />
+                    <figcaption align="middle">Blinn-Phong</figcaption>
+                </tr>
+    
+            </table>
+        </div>
+              <br>
+             <img src="images/a (27).jpg" width="480px" />
+             <br>
+             <p> Here we show another model we can use, a simple texture mapping from a texture to the cloth. Here we get the color of a fragment from a texture rather than a lighting model. </p>
+              <br>
+              <img src="images/a (28).jpg" width="480px" />
+              <br>
+              <p> We can do more than just use textures to color fragments, we can indeed use them to add geometric details into the scene. Below we use two methods for doing such: Bump mapping and Displacement mapping. Bump mapping uses a texture to modify the normal vectors in the Fragment shader to give the illusion of detail. Displacement mapping does the same thing, but also modifies the position of vertices in the Vertex shader to represent detail from the texture. This texture is referred to as a height map since it adds height to the object in the scene. </p>
+        <div align="left">
+            <table style="width=100%">
+                <tr>
+                    <td align="middle">
+                    <img src="images/a (29).jpg" width="480px" />
+                    <figcaption align="middle">Bump map</figcaption>
+                    </td>
+                    <td align="middle">
+                    <img src="images/a (30).jpg" width="480px" />
+                    <figcaption align="middle">Bump map</figcaption>
+                    </td>
+                </tr>
+                <tr>
+                 <td align="middle">
+<img src="images/a (31).jpg" width="480px" />
+<figcaption align="middle">Displacement map</figcaption>
+
+</tr>
+            </table>
+        </div>
+
+<p> As shown above, both of these techniques attempt to do the same thing. The only difference is in the fact the displacement mapping also changes the geometry of the scene. If we look at the example above, the displacement mapping has added grooves around the edges of the sphere. </p>
+        <div align="left">
+            <table style="width=100%">
+                <tr>
+                    <td align="middle">
+                    <img src="images/a (32).jpg" width="480px" />
+                    <figcaption align="middle">Vertical res =16 Horizontal res = 16</figcaption>
+                    <td align="middle">
+                    <img src="images/a (33).jpg" width="480px" />
+                    <figcaption align="middle">Vertical res =128 Horizontal res = 128</figcaption>
+                </tr>
+                <tr>
+                    <td align="middle">
+                    <img src="images/a (34).jpg" width="480px" />
+                    <figcaption align="middle">Vertical res =16 Horizontal res = 16</figcaption>
+                    <td align="middle">
+                    <img src="images/a (35).jpg" width="480px" />
+                    <figcaption align="middle">Vertical res =128 Horizontal res = 128</figcaption>
+                </tr>
+    
+            </table>
+        </div>
+
+<p> Something else to note though, is the effect that detail in the geometry effects the two techniques. As shown above with a higher resolution geometry, bump mapping has the same effects, while displacement mapping does not for the same settings. The higher the resolution the more physical bumps there will be in the displacement map. </p>
+
+        <div align="left">
+            <table style="width=100%">
+                <tr>
+                    <td align="middle">
+                    <img src="images/a (36).jpg" width="480px" />
+                    </td>
+                    <td align="middle">
+                    <img src="images/a (37).jpg" width="480px" />
+                    </td>
+                </tr>
+            </table>
+        </div>
+<p> We can also map an environment map to the geometry to get a mirror shader. </p>
+                <div align="left">
+            <table style="width=100%">
+                <tr>
+                    <td align="middle">
+                    <img src="images/a (38).jpg" width="480px" />
+                    </td>
+                    <td align="middle">
+                    <img src="images/a (39).jpg" width="480px" />
+                    </td>
+                </tr>
+            </table>
+        </div>
+<p> Finally, we can also combine shading models together to create a custom shader that creates unique effects. Here I combined a displacement map, mirror shader, and Blinn-Phong shader, to create models that look like they have a coating on top of them. </p>
+</body>
+</html>
